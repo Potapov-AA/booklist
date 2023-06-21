@@ -1,126 +1,77 @@
 package com.jester.booklist.controllers;
 
-import java.util.ArrayList;
-import java.util.Optional;
+import java.util.List;
 
-import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.stereotype.Controller;
-import org.springframework.ui.Model;
+import org.springframework.http.HttpStatus;
+import org.springframework.http.ResponseEntity;
+import org.springframework.web.bind.annotation.DeleteMapping;
 import org.springframework.web.bind.annotation.GetMapping;
+import org.springframework.web.bind.annotation.PatchMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
+import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
-import org.springframework.web.bind.annotation.RequestParam;
+import org.springframework.web.bind.annotation.RestController;
 
-import com.jester.booklist.models.Book;
-import com.jester.booklist.repo.BookRepository;
+import com.jester.booklist.model.Book;
+import com.jester.booklist.service.BookCreationRequest;
+import com.jester.booklist.service.BooklistService;
 
-@Controller
-@RequestMapping(path="/books")
+import lombok.RequiredArgsConstructor;
+
+@RestController
+@RequestMapping(path = "/api/books")
+@RequiredArgsConstructor
 public class BookController {
-	
-	@Autowired
-	private BookRepository bookRepository;
-	
-	@GetMapping
-	public String BooksGet(Model model) {
-		Iterable<Book> books = bookRepository.findAll();
+
+	private final BooklistService booklistService;
+
+	@GetMapping()
+	public ResponseEntity<List<Book>> readBooks() {
+
+		final List<Book> books = booklistService.readBooks();
+
+		return books != null && !books.isEmpty() 
+				? new ResponseEntity<List<Book>>(books, HttpStatus.OK)
+				: new ResponseEntity<List<Book>>(HttpStatus.NOT_FOUND);
+	}
+
+	@GetMapping("/{bookId}")
+	public ResponseEntity<Book> readBook(@PathVariable(name = "bookId") Long bookId) {
+
+		final Book book = booklistService.readBook(bookId);
+
+		return book != null 
+				? new ResponseEntity<Book>(book, HttpStatus.OK)
+				: new ResponseEntity<Book>(HttpStatus.NOT_FOUND);
+	}
+
+	@PostMapping()
+	public ResponseEntity<Book> createBook(@RequestBody BookCreationRequest request) {
 		
-		model.addAttribute("books", books);
-		model.addAttribute("title", "Мои книги");
+		final Book book = booklistService.createBook(request);
 		
-		return "books/books";
+		return book != null 
+				? new ResponseEntity<Book>(book, HttpStatus.CREATED)
+				: new ResponseEntity<Book>(HttpStatus.NOT_FOUND);
 	}
 	
-	@GetMapping("/add")
-	public String BookAddGet(Model model) {
+	@PatchMapping("/{bookId}")
+	public ResponseEntity<Book> updateBook(@PathVariable(name = "bookId") Long bookId, @RequestBody BookCreationRequest request) {
 		
-		model.addAttribute("title", "Добавить книгу");
-		return "books/books-add";
+		final Book book = booklistService.updateBook(request, bookId);
+		
+		return book != null 
+				? new ResponseEntity<Book>(book, HttpStatus.OK)
+				: new ResponseEntity<Book>(HttpStatus.NOT_MODIFIED);
+						
 	}
 	
-	@PostMapping("/add")
-	public String BookAddPost(@RequestParam String title,
-			@RequestParam String author,
-			@RequestParam String anotation,
-			@RequestParam String opinion,
-			@RequestParam(required=true, defaultValue = "off") String status,
-			Model model) {
+	@DeleteMapping("/{bookId}")
+	public ResponseEntity<Void> deleteBook(@PathVariable(name = "bookId") Long bookId) {
 		
-		Boolean read = false;
-		if (status.equals("on")) {
-			read = true;
-		}
+		booklistService.deleteBook(bookId);
 		
-		Book book = new Book(title, author, anotation, opinion, read);
-		bookRepository.save(book);
-		return "redirect:/books";
-	}
-	
-	@GetMapping("/{id}")
-	public String BookOneGet(@PathVariable(value = "id") long id,
-			Model model) {
-		
-		if(!bookRepository.existsById(id)) {
-			return "redirect:/books";
-		}
-		
-		Optional<Book> book = bookRepository.findById(id);
-		ArrayList<Book> arrayList = new ArrayList<>();
-		book.ifPresent(arrayList::add);
-		model.addAttribute("book", arrayList);
-		return "books/books-one";
-	}
-	
-	@GetMapping("/{id}/edit")
-	public String BookEditGet(@PathVariable(value = "id") long id,
-			Model model) {
-		
-		if(!bookRepository.existsById(id)) {
-			return "redirect:/books";
-		}
-		
-		Optional<Book> book = bookRepository.findById(id);
-		ArrayList<Book> arrayList = new ArrayList<>();
-		book.ifPresent(arrayList::add);
-		model.addAttribute("book", arrayList);
-		return "books/books-edit";
-	}
-	
-	@PostMapping("{id}/edit")
-	public String BookEditPost(@PathVariable(value = "id") long id,
-			@RequestParam String title,
-			@RequestParam String author,
-			@RequestParam String anotation,
-			@RequestParam String opinion,
-			@RequestParam(required=true, defaultValue = "off") String status,
-			Model model) {
-		
-		Boolean read = false;
-		if (status.equals("on")) {
-			read = true;
-		}
-		
-		Book book = bookRepository.findById(id).orElseThrow();
-		book.setTitle(title);
-		book.setAuthor(author);
-		book.setAnotation(anotation);
-		book.setOpinion(opinion);
-		book.setStatus(read);
-		
-		bookRepository.save(book);
-		
-		return "redirect:/books";
-	}
-	
-	@PostMapping("{id}/remove")
-	public String BookRemove(@PathVariable(value = "id") long id,
-			Model model) {
-		
-		Book book = bookRepository.findById(id).orElseThrow();
-		
-		bookRepository.delete(book);
-		
-		return "redirect:/books";
+		return ResponseEntity.ok().build();
 	}
 }
